@@ -1,0 +1,632 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raic.dev/schema/v1.0",
+  "title": "RAIC — Requirements as Intelligent Code",
+  "description": "Schema for validating RAIC requirement files (v1.0)",
+  "type": "object",
+  "oneOf": [
+    {
+      "required": ["product"],
+      "properties": {
+        "product": { "$ref": "#/$defs/product" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "required": ["module"],
+      "properties": {
+        "module": { "$ref": "#/$defs/module" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "required": ["glossary"],
+      "properties": {
+        "glossary": { "$ref": "#/$defs/glossary" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "required": ["feature"],
+      "properties": {
+        "feature": { "$ref": "#/$defs/feature" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "required": ["requirement"],
+      "properties": {
+        "requirement": { "$ref": "#/$defs/requirement" }
+      },
+      "additionalProperties": false
+    }
+  ],
+
+  "$defs": {
+
+    "priority": {
+      "type": "string",
+      "enum": ["MUST", "SHOULD", "MAY", "MUST_NOT", "SHOULD_NOT"],
+      "description": "RFC 2119 priority keyword"
+    },
+
+    "lifecycle_status": {
+      "type": "string",
+      "enum": ["draft", "active", "superseded", "deprecated"],
+      "description": "Requirement lifecycle status"
+    },
+
+    "feature_type": {
+      "type": "string",
+      "enum": ["feature", "bugfix", "refactoring", "spike"]
+    },
+
+    "nfr_type": {
+      "type": "string",
+      "enum": [
+        "performance",
+        "security",
+        "reliability",
+        "scalability",
+        "usability",
+        "maintainability",
+        "portability",
+        "compatibility"
+      ]
+    },
+
+    "complexity": {
+      "type": "string",
+      "enum": ["trivial", "low", "medium", "high", "very_high"]
+    },
+
+    "testing_strategy": {
+      "type": "string",
+      "enum": ["unit", "integration", "e2e", "manual"]
+    },
+
+    "question_status": {
+      "type": "string",
+      "enum": ["open", "resolved"]
+    },
+
+    "coverage_status": {
+      "type": "string",
+      "enum": ["full", "partial", "none"]
+    },
+
+    "stakeholder": {
+      "type": "object",
+      "required": ["role"],
+      "properties": {
+        "role": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "context": {
+      "type": "object",
+      "required": ["problem", "impact"],
+      "properties": {
+        "problem": { "type": "string" },
+        "impact": { "type": "string" },
+        "stakeholders": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stakeholder" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "flow_step": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": { "type": "string" },
+      "description": "A single step in a flow. Key is the actor (user, system, admin, etc.), value is the action."
+    },
+
+    "alternative_path": {
+      "type": "object",
+      "required": ["condition", "steps"],
+      "properties": {
+        "condition": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/flow_step" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "flow": {
+      "type": "object",
+      "required": ["id", "title", "actor", "trigger", "steps", "postconditions"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^FLOW-\\d+$"
+        },
+        "title": { "type": "string" },
+        "actor": { "type": "string" },
+        "trigger": { "type": "string" },
+        "preconditions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/flow_step" },
+          "minItems": 1
+        },
+        "alternative_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/alternative_path" }
+        },
+        "error_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/alternative_path" }
+        },
+        "postconditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "changelog_entry": {
+      "type": "object",
+      "required": ["date", "author", "change"],
+      "properties": {
+        "date": { "type": "string" },
+        "author": { "type": "string" },
+        "change": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "spec": {
+      "type": "object",
+      "required": ["id", "priority", "statement"],
+      "properties": {
+        "id": { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "category": { "type": "string" },
+        "flow_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "statement": { "type": "string" },
+        "rationale": { "type": "string" },
+        "status": { "$ref": "#/$defs/lifecycle_status" },
+        "superseded_by": { "type": "string" },
+        "environments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "changelog": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/changelog_entry" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "boundary_case": {
+      "type": "object",
+      "required": ["given", "then"],
+      "properties": {
+        "given": { "type": "string" },
+        "then": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "acceptance_criterion": {
+      "type": "object",
+      "required": ["id", "spec_refs", "given", "when", "then"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^AC-\\d+$"
+        },
+        "spec_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "given": { "type": "string" },
+        "when": { "type": "string" },
+        "then": { "type": "string" },
+        "boundary_cases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/boundary_case" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "non_functional_requirement": {
+      "type": "object",
+      "required": ["type", "statement"],
+      "properties": {
+        "type": { "$ref": "#/$defs/nfr_type" },
+        "statement": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "failure_mode": {
+      "type": "object",
+      "required": ["type", "strategy"],
+      "properties": {
+        "type": { "type": "string" },
+        "strategy": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "external_dependency": {
+      "type": "object",
+      "required": ["id", "service", "used_by", "failure_modes"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^DEP-\\d+$"
+        },
+        "service": { "type": "string" },
+        "used_by": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "failure_modes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/failure_mode" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "concurrency_risk": {
+      "type": "object",
+      "required": ["flows", "scenario", "expected_behavior"],
+      "properties": {
+        "flows": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2
+        },
+        "scenario": { "type": "string" },
+        "expected_behavior": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "permission": {
+      "type": "object",
+      "required": ["flow", "required_role"],
+      "properties": {
+        "flow": { "type": "string" },
+        "required_role": { "type": "string" },
+        "mfa_required": {
+          "type": "boolean",
+          "default": false
+        },
+        "condition": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "conflict": {
+      "type": "object",
+      "required": ["specs", "description"],
+      "properties": {
+        "specs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2
+        },
+        "description": { "type": "string" },
+        "resolution": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "open_question": {
+      "type": "object",
+      "required": ["id", "question", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^Q\\d+$"
+        },
+        "question": { "type": "string" },
+        "status": { "$ref": "#/$defs/question_status" },
+        "resolution": { "type": "string" },
+        "blocking": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "properties": { "status": { "const": "resolved" } }
+      },
+      "then": {
+        "required": ["resolution"]
+      }
+    },
+
+    "agent_hints": {
+      "type": "object",
+      "properties": {
+        "implementation_order": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "estimated_complexity": { "$ref": "#/$defs/complexity" },
+        "requires_migration": { "type": "boolean" },
+        "requires_new_api_endpoints": { "type": "boolean" },
+        "testing_strategy": { "$ref": "#/$defs/testing_strategy" },
+        "files_likely_affected": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "decomposed_into": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "coverage": { "$ref": "#/$defs/coverage_status" }
+      },
+      "additionalProperties": false
+    },
+
+    "product_stakeholder": {
+      "type": "object",
+      "required": ["role"],
+      "properties": {
+        "role": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "module_ref": {
+      "type": "object",
+      "required": ["$ref"],
+      "properties": {
+        "$ref": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "product": {
+      "type": "object",
+      "required": ["id", "title", "description", "stakeholders", "modules"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "stakeholders": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/product_stakeholder" },
+          "minItems": 1
+        },
+        "modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/module_ref" },
+          "minItems": 1
+        },
+        "global_constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "global_non_functional": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/non_functional_requirement" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "module_feature_ref": {
+      "type": "object",
+      "required": ["id", "$ref", "status", "priority"],
+      "properties": {
+        "id": { "type": "string" },
+        "$ref": { "type": "string" },
+        "status": { "$ref": "#/$defs/lifecycle_status" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "success_metric": {
+      "type": "object",
+      "required": ["metric", "target"],
+      "properties": {
+        "metric": { "type": "string" },
+        "target": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "module": {
+      "type": "object",
+      "required": ["id", "title", "status", "description"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "$ref": "#/$defs/lifecycle_status" },
+        "description": { "type": "string" },
+        "modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/module_ref" },
+          "minItems": 1
+        },
+        "features": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/module_feature_ref" },
+          "minItems": 1
+        },
+        "depends_on_modules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "success_metrics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/success_metric" }
+        }
+      },
+      "anyOf": [
+        { "required": ["modules"] },
+        { "required": ["features"] }
+      ],
+      "additionalProperties": false
+    },
+
+    "glossary_term": {
+      "type": "object",
+      "required": ["term", "definition"],
+      "properties": {
+        "term": { "type": "string" },
+        "definition": { "type": "string" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "see_also": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "glossary": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/glossary_term" },
+      "minItems": 1
+    },
+
+    "feature_fields": {
+      "type": "object",
+      "required": ["id", "title", "type", "status", "context", "specs", "acceptance_criteria"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "$ref": "#/$defs/feature_type" },
+        "status": { "$ref": "#/$defs/lifecycle_status" },
+        "epic": { "type": "string" },
+        "superseded_by": { "type": "string" },
+        "context": { "$ref": "#/$defs/context" },
+        "flows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/flow" },
+          "minItems": 1
+        },
+        "specs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/spec" },
+          "minItems": 1
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acceptance_criterion" },
+          "minItems": 1
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "non_functional": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/non_functional_requirement" }
+        },
+        "external_dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/external_dependency" }
+        },
+        "concurrency_risks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/concurrency_risk" }
+        },
+        "permissions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/permission" }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/conflict" }
+        },
+        "open_questions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/open_question" }
+        },
+        "agent_hints": { "$ref": "#/$defs/agent_hints" }
+      },
+      "additionalProperties": false
+    },
+
+    "feature": {
+      "$ref": "#/$defs/feature_fields"
+    },
+
+    "requirement": {
+      "type": "object",
+      "required": ["id", "title", "type", "status", "context", "specs", "acceptance_criteria"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "$ref": "#/$defs/feature_type" },
+        "status": { "$ref": "#/$defs/lifecycle_status" },
+        "epic": { "type": "string" },
+        "superseded_by": { "type": "string" },
+        "context": { "$ref": "#/$defs/context" },
+        "specs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/spec" },
+          "minItems": 1
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acceptance_criterion" },
+          "minItems": 1
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "non_functional": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/non_functional_requirement" }
+        },
+        "external_dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/external_dependency" }
+        },
+        "open_questions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/open_question" }
+        },
+        "agent_hints": { "$ref": "#/$defs/agent_hints" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
