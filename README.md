@@ -69,14 +69,6 @@ python -m jsonschema -i your-feature.yaml schema.json
 | **Acceptance Criterion** | Given/When/Then test case linked to specs |
 | **Agent Hints** | Metadata to guide AI implementation |
 
-## Priority Keywords
-
-RAIC uses [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119) keywords:
-
-- `MUST` / `MUST_NOT` — absolute requirements
-- `SHOULD` / `SHOULD_NOT` — recommended, but exceptions allowed
-- `MAY` — truly optional
-
 ## License
 
 [MIT](LICENSE)
