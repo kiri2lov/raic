@@ -1,6 +1,6 @@
 # RAIC — Requirements as Intelligent Code
 
-## Specification v1.0
+## Specification v1.1
 
 **RAIC** (Requirements as Intelligent Code) is a YAML-based domain-specific language for expressing software requirements in a structured, machine-parseable format optimized for AI-driven development agents.
 
@@ -32,13 +32,16 @@
   - [5.14 Open Questions](#514-open-questions)
   - [5.15 Agent Hints](#515-agent-hints)
 - [6. Priority Keywords](#6-priority-keywords)
-- [7. Requirement Lifecycle](#7-requirement-lifecycle)
+- [7. Requirement Lifecycle and Implementation Status](#7-requirement-lifecycle-and-implementation-status)
+  - [7.1 Lifecycle: is it approved?](#71-lifecycle-is-it-approved)
+  - [7.2 Implementation: is it built?](#72-implementation-is-it-built)
 - [8. Traceability Model](#8-traceability-model)
 - [9. Scalability: Simple vs Complex Features](#9-scalability-simple-vs-complex-features)
 - [10. JSON Schema](#10-json-schema)
 - [11. Complete Example](#11-complete-example)
 - [12. Design Decisions and Rationale](#12-design-decisions-and-rationale)
-- [13. References](#13-references)
+- [13. Changelog](#13-changelog)
+- [14. References](#14-references)
 
 ---
 
@@ -403,9 +406,12 @@ The top-level container for a complex feature.
 | `id` | string | yes | Unique identifier, matches the external tracker (e.g., Jira key) |
 | `title` | string | yes | Human-readable feature title |
 | `type` | enum | yes | `feature`, `bugfix`, `refactoring`, `spike` |
-| `status` | enum | yes | `draft`, `active`, `superseded`, `deprecated` |
+| `status` | enum | yes | `draft`, `active`, `superseded`, `deprecated` — approval, see [Section 7.1](#71-lifecycle-is-it-approved) |
+| `implementation` | object | no | Whether the feature has been built, see [Section 7.2](#72-implementation-is-it-built) |
 | `epic` | string | no | Parent epic ID |
 | `superseded_by` | string | no | ID of the requirement that replaces this one (when status is `superseded`) |
+| `depends_on` | array of strings | no | IDs of features that must be implemented first |
+| `glossary_refs` | array of strings | no | Canonical glossary terms this feature relies on |
 | `context` | object | yes | Problem statement, impact, and stakeholders |
 | `flows` | array | no | User interaction flows |
 | `specs` | array | yes | Functional requirements |
@@ -419,7 +425,15 @@ The top-level container for a complex feature.
 | `open_questions` | array | no | Unresolved questions blocking implementation |
 | `agent_hints` | object | no | AI-agent-specific metadata |
 
-For simple tasks, use `requirement` as the root key instead of `feature`. The `requirement` root supports the same fields but `flows`, `concurrency_risks`, and `permissions` are omitted.
+For simple tasks, use `requirement` as the root key instead of `feature`. The
+`requirement` root supports the same fields except `flows`,
+`concurrency_risks`, `permissions`, and `conflicts`, which it omits.
+
+These are two different document shapes, not two spellings of one. Both roots
+set `additionalProperties: false`, so a file using any of the four omitted
+sections **must** use `feature` — a `requirement` file carrying `flows` fails
+validation. The practical rule: if the requirement has user-facing flows worth
+writing down, it is a `feature`.
 
 ### 5.5 Context
 
@@ -428,8 +442,14 @@ Provides the "why" behind the feature.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `problem` | string | yes | What problem does this feature solve? |
+| `solution` | string | no | The approach chosen, at the level of intent rather than implementation |
 | `impact` | string | yes | What is the impact of not solving it? |
 | `stakeholders` | array of objects | no | Who cares about this feature? Each entry has a `role` field |
+
+`solution` records *which* approach was chosen among those considered, so
+that a later reader can tell a deliberate decision from an accident. It
+states intent, not mechanism — mechanism belongs in `specs` and
+`constraints`.
 
 ### 5.6 Flows
 
@@ -461,6 +481,7 @@ Individual functional requirements using [EARS syntax](https://ieeexplore.ieee.o
 | `statement` | string | yes | The requirement text, preferably in EARS format |
 | `rationale` | string | no | Why this requirement exists |
 | `status` | enum | no | `draft`, `active`, `superseded`, `deprecated`. Defaults to `active` |
+| `implementation` | enum | no | `not_implemented`, `partial`, `implemented` — see [Section 7.2](#72-implementation-is-it-built) |
 | `superseded_by` | string | no | ID of the replacement requirement |
 | `environments` | array of strings | no | Which environments this applies to (e.g., `production`, `staging`). If omitted, applies to all |
 | `changelog` | array of objects | no | Change history. Each entry: `date` (string), `author` (string), `change` (string) |
@@ -481,22 +502,46 @@ Testable criteria in [Gherkin](https://cucumber.io/docs/gherkin/) format.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | string | yes | Unique AC identifier (e.g., `AC-01`) |
+| `id` | string | yes | Unique AC identifier matching `^AC-\d+[a-z]?$` (e.g., `AC-01`, `AC-01a`) |
 | `spec_refs` | array of strings | yes | Which specs this criterion validates |
 | `given` | string | yes | Initial state / precondition |
 | `when` | string | yes | Action or event |
 | `then` | string | yes | Expected outcome |
 | `boundary_cases` | array of objects | no | Edge cases. Each has `given` and `then` fields |
 
+The optional letter suffix splits one criterion into variants (`AC-01a`,
+`AC-01b`) without renumbering every criterion that follows it — renumbering
+would silently invalidate references held outside the file.
+
 ### 5.9 Constraints
 
-Hard constraints on the implementation. Each constraint is a string using RFC 2119 keywords.
+Hard constraints on the implementation, stated with RFC 2119 keywords.
 
 ```yaml
 constraints:
   - Payment processing MUST use idempotency keys
   - All subscription mutations MUST be wrapped in DB transactions
 ```
+
+A constraint may instead be an object when it needs an ID to be cited from
+a code comment, a review, or a `conflicts` entry. Use the plain string form
+unless the constraint actually needs to be referenced — an ID that nothing
+points at is noise.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | yes | Constraint identifier matching `^C-\d+$` |
+| `statement` | string | yes | The constraint, using RFC 2119 keywords |
+| `rationale` | string | no | Why the constraint exists, so a later reader can tell whether it still applies |
+
+```yaml
+constraints:
+  - id: C-01
+    statement: Audio format MUST be mp3
+    rationale: Safari does not play ogg; mp3 is the only format every target browser decodes.
+```
+
+Both forms may appear in the same list.
 
 ### 5.10 Non-Functional Requirements
 
@@ -564,7 +609,14 @@ AI-agent-specific metadata that helps with implementation planning.
 | `testing_strategy` | enum | no | `unit`, `integration`, `e2e`, `manual` |
 | `files_likely_affected` | array of strings | no | File paths likely to be modified |
 | `decomposed_into` | array of strings | no | Jira task IDs if this feature was split |
-| `coverage` | enum | no | `full`, `partial`, `none` — implementation coverage status |
+| `notes` | string | no | Free-form guidance for the implementing agent that no other field captures |
+| `coverage` | enum | no | **Deprecated since v1.1.** Use the top-level `implementation` object instead |
+
+`coverage` was the only way v1.0 could express delivery state, and it did so
+indirectly — as a hint, in a section agents are free to ignore, under a name
+that does not say whether it means code or tests. [Section 7.2](#72-implementation-is-it-built)
+replaces it with a first-class field. Readers should prefer `implementation`
+where both appear.
 
 ---
 
@@ -582,7 +634,20 @@ RAIC uses [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt) keywords with strict 
 
 ---
 
-## 7. Requirement Lifecycle
+## 7. Requirement Lifecycle and Implementation Status
+
+A requirement has two independent states, and conflating them is the most
+common way a RAIC tree goes stale. `status` answers *may this be built?*
+— it is a decision made by people. `implementation` answers *has it been
+built?* — it is a fact about the codebase.
+
+They are orthogonal: an `active` requirement may be fully implemented,
+half-implemented, or untouched, and all three are legitimate. Encoding
+delivery into the lifecycle enum (a `status: implemented` value, say)
+destroys the approval axis and leaves an agent unable to tell an approved
+backlog item from a shipped one.
+
+### 7.1 Lifecycle: is it approved?
 
 ```mermaid
 stateDiagram-v2
@@ -601,6 +666,67 @@ stateDiagram-v2
 | `active` | Approved and ready for implementation | Agent can implement |
 | `superseded` | Replaced by another requirement | Agent must use `superseded_by` target instead |
 | `deprecated` | No longer relevant | Agent must ignore |
+
+### 7.2 Implementation: is it built?
+
+The optional `implementation` object records delivery. It is a statement
+about the code, so it is updated when code ships — not when a decision is
+made.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status` | enum | yes | `not_implemented`, `partial`, `implemented` |
+| `since` | string | no | Product version or release in which this shipped |
+| `notes` | string | no | Deviations from the spec, or what remains when `partial` |
+
+| Status | Meaning | Agent Behavior |
+|--------|---------|----------------|
+| `not_implemented` | No code exists for this requirement | Agent implements from scratch |
+| `partial` | Some specs are satisfied, others are not | Agent reads per-spec `implementation` to find the gap |
+| `implemented` | Every `MUST` spec is satisfied by code | Agent treats the spec as describing existing behavior, and changes it only deliberately |
+
+Individual specs carry the same enum directly, which is what makes
+`partial` actionable rather than a vague label:
+
+```yaml
+requirement:
+  id: TFX-500
+  title: Plan upgrades
+  type: feature
+  status: active
+  implementation:
+    status: partial
+    notes: Proration is specified but not built; everything else ships.
+
+  context:
+    problem: Users on the wrong plan have no way to move without support.
+    impact: Support handles every plan change by hand.
+
+  specs:
+    - id: TFX-500-01
+      priority: MUST
+      statement: When a user upgrades, the system shall switch the plan immediately.
+      implementation: implemented
+
+    - id: TFX-500-07
+      priority: SHOULD
+      statement: When a user upgrades mid-cycle, the system shall prorate the charge.
+      implementation: not_implemented
+
+  acceptance_criteria:
+    - id: AC-01
+      spec_refs: [TFX-500-01]
+      given: a user on the Basic plan
+      when: the user upgrades to Pro
+      then: the plan is Pro and the change is effective immediately
+```
+
+When a feature omits `implementation` entirely, its delivery state is
+unknown — not `not_implemented`. Tools should report it as unknown rather
+than assume either extreme.
+
+Omitting the field is reasonable for a requirement that is still `draft`,
+where there is nothing to report yet.
 
 ---
 
@@ -645,7 +771,8 @@ graph TD
 - Features can belong to any module at any depth
 - Global constraints and NFRs in `product.yml` are inherited by all features in all modules
 - Module-level `depends_on_modules` prevents work on dependent domains before prerequisites are met
-- Feature-level `depends_on` within a module establishes implementation order
+- Feature-level `depends_on` establishes implementation order. It may be declared on the feature itself, in the module's entry for that feature, or both — a feature file stays readable on its own, while the module index stays readable as a whole. When both are present they must agree; a validator should flag divergence.
+- `glossary_refs` names the terms a feature depends on, so that changing a definition surfaces every feature that relied on it
 
 **Feature-level traceability:**
 - Every spec can be traced back to the flow it supports
@@ -726,6 +853,9 @@ feature:
   title: Subscription management
   type: feature
   status: active
+  implementation:
+    status: implemented
+    since: "2.4.0"
   epic: TFX-100
 
   context:
@@ -1122,6 +1252,27 @@ Traditional requirements formats assume a human reader who can infer implementat
 
 These hints are advisory — the agent may override them based on its analysis.
 
+### Why separate `implementation` from `status`?
+
+Because they answer different questions and are decided by different parties.
+`status` is a decision people make about whether work is approved;
+`implementation` is a fact about whether the code exists. A requirement that
+is approved but unbuilt, and one that is approved and shipped, are both
+`active` — and an agent needs to tell them apart before it starts writing.
+
+v1.0 offered only `agent_hints.coverage` for this, which failed in three
+ways: it sat in an advisory section an agent may ignore, its name did not say
+whether it meant code or tests, and it had no per-spec granularity, so
+`partial` named a problem without locating it.
+
+The failure mode this prevents is specific and common. Without a delivery
+axis, teams reach for the lifecycle enum and invent values like
+`implemented` or `proposed`. Those values are not in the lifecycle enum, so
+such files silently stop validating; worse, the approval information is
+overwritten and cannot be recovered — once a requirement reads
+`status: implemented`, nothing records whether it was ever approved, and an
+agent can no longer distinguish an approved backlog item from a rejected one.
+
 ### Why `conflicts` as a first-class section?
 
 Requirements conflicts are the most expensive bugs to fix because they are discovered late (during integration or QA). Making conflicts explicit:
@@ -1193,7 +1344,31 @@ Both tools were evaluated (see [Section 3](#3-influences-and-references)) and fo
 
 ---
 
-## 13. References
+## 13. Changelog
+
+### v1.1
+
+Additive and backwards compatible: every v1.0 document remains valid.
+
+**Implementation status** — a delivery axis independent of the lifecycle.
+- New optional `implementation` object on `feature` / `requirement`: `status` (`not_implemented` / `partial` / `implemented`), `since`, `notes`
+- New optional `implementation` enum on each spec, which makes `partial` locatable
+- `agent_hints.coverage` deprecated in favour of it
+
+**Fields promoted from practice** — each had been improvised by projects using RAIC, which is the evidence that the format was missing them.
+- `context.solution` — which approach was chosen, at the level of intent
+- `depends_on` and `glossary_refs` on `feature` / `requirement`
+- `agent_hints.notes` — free-form guidance no other field captures
+- `constraints` entries may now be `{id, statement, rationale}` objects as well as plain strings
+- Acceptance criterion IDs accept a letter suffix (`AC-01a`), so splitting a criterion does not renumber the rest
+
+**Corrections**
+- Section 5.4 listed three fields absent from the `requirement` root; `conflicts` was the missing fourth
+- Section 5.4 now states plainly that `feature` and `requirement` are distinct document shapes rather than interchangeable spellings, and that `additionalProperties: false` makes a `requirement` file carrying `flows` invalid
+
+---
+
+## 14. References
 
 1. **Mavin, A., Wilkinson, P., Harwood, A., & Novak, M.** (2009). Easy Approach to Requirements Syntax (EARS). *17th IEEE International Requirements Engineering Conference*. [DOI: 10.1109/RE.2009.9](https://ieeexplore.ieee.org/document/5328509)
 

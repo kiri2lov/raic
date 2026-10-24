@@ -42,7 +42,7 @@ feature:
 
 ## Documentation
 
-- [Specification](specification.md) — full RAIC specification (v1.0)
+- [Specification](specification.md) — full RAIC specification (v1.1)
 - [JSON Schema](schema.json) — machine-readable schema for validation
 
 ## Schema Validation

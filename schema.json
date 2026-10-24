@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raic.dev/schema/v1.0",
+  "$id": "https://raic.dev/schema/v1.1",
   "title": "RAIC — Requirements as Intelligent Code",
-  "description": "Schema for validating RAIC requirement files (v1.0)",
+  "description": "Schema for validating RAIC requirement files (v1.1)",
   "type": "object",
   "oneOf": [
     {
@@ -53,7 +53,30 @@
     "lifecycle_status": {
       "type": "string",
       "enum": ["draft", "active", "superseded", "deprecated"],
-      "description": "Requirement lifecycle status"
+      "description": "Requirement lifecycle status: whether the requirement is approved for implementation. Orthogonal to implementation_status, which records whether it has been built."
+    },
+
+    "implementation_status": {
+      "type": "string",
+      "enum": ["not_implemented", "partial", "implemented"],
+      "description": "Whether the requirement has been built. Orthogonal to lifecycle_status, which records whether it is approved."
+    },
+
+    "implementation": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/implementation_status" },
+        "since": {
+          "type": "string",
+          "description": "Product version or release in which this shipped"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Deviations from the specification, or what remains when status is partial"
+        }
+      },
+      "additionalProperties": false
     },
 
     "feature_type": {
@@ -104,11 +127,35 @@
       "additionalProperties": false
     },
 
+    "constraint": {
+      "description": "A hard constraint on the implementation, stated with RFC 2119 keywords. Use the plain string form unless the constraint needs an ID to be referenced from elsewhere.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["id", "statement"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^C-\\d+$"
+            },
+            "statement": { "type": "string" },
+            "rationale": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+
     "context": {
       "type": "object",
       "required": ["problem", "impact"],
       "properties": {
         "problem": { "type": "string" },
+        "solution": {
+          "type": "string",
+          "description": "The approach chosen to solve the problem, at the level of intent rather than implementation"
+        },
         "impact": { "type": "string" },
         "stakeholders": {
           "type": "array",
@@ -207,6 +254,7 @@
         "statement": { "type": "string" },
         "rationale": { "type": "string" },
         "status": { "$ref": "#/$defs/lifecycle_status" },
+        "implementation": { "$ref": "#/$defs/implementation_status" },
         "superseded_by": { "type": "string" },
         "environments": {
           "type": "array",
@@ -236,7 +284,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^AC-\\d+$"
+          "pattern": "^AC-\\d+[a-z]?$",
+          "description": "An optional letter suffix (AC-01a, AC-01b) splits one criterion into variants without renumbering those that follow"
         },
         "spec_refs": {
           "type": "array",
@@ -386,7 +435,15 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "coverage": { "$ref": "#/$defs/coverage_status" }
+        "notes": {
+          "type": "string",
+          "description": "Free-form guidance for the implementing agent that no other field captures"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage_status",
+          "deprecated": true,
+          "description": "Deprecated since v1.1 — use the top-level `implementation` object instead, which states plainly whether the requirement has been built"
+        }
       },
       "additionalProperties": false
     },
@@ -532,8 +589,19 @@
         "title": { "type": "string" },
         "type": { "$ref": "#/$defs/feature_type" },
         "status": { "$ref": "#/$defs/lifecycle_status" },
+        "implementation": { "$ref": "#/$defs/implementation" },
         "epic": { "type": "string" },
         "superseded_by": { "type": "string" },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs of features that must be implemented before this one"
+        },
+        "glossary_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Canonical glossary terms this feature relies on"
+        },
         "context": { "$ref": "#/$defs/context" },
         "flows": {
           "type": "array",
@@ -552,7 +620,7 @@
         },
         "constraints": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "$ref": "#/$defs/constraint" }
         },
         "non_functional": {
           "type": "array",
@@ -595,6 +663,17 @@
         "title": { "type": "string" },
         "type": { "$ref": "#/$defs/feature_type" },
         "status": { "$ref": "#/$defs/lifecycle_status" },
+        "implementation": { "$ref": "#/$defs/implementation" },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs of requirements that must be implemented before this one"
+        },
+        "glossary_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Canonical glossary terms this requirement relies on"
+        },
         "epic": { "type": "string" },
         "superseded_by": { "type": "string" },
         "context": { "$ref": "#/$defs/context" },
@@ -610,7 +689,7 @@
         },
         "constraints": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "$ref": "#/$defs/constraint" }
         },
         "non_functional": {
           "type": "array",
